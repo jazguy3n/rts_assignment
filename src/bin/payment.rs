@@ -4,13 +4,12 @@ use std::{
 };
 
 use rts_assignment::{
-    rabbitmq::recv_msg,
+    rabbitmq::{send_msg, recv_msg},
     structs::Order,
 };
 
 use serde_json;
 use rand::Rng;
-use rts_assignment::rabbitmq::send_msg;
 
 fn main() {
     let (payment_tx, payment_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
@@ -57,12 +56,14 @@ fn process_payment(order: &mut Order) {
     if rng.gen_bool(0.7) {
         order.payment_status = true;
         println!("Payment is successful!");
+        //Send the order to the inventory system
         let serialized_order = serde_json::to_string(&order).unwrap();
         send_msg(serialized_order, "inventory_queue").unwrap();
         println!("Order ID {} has been sent to the inventory system.", order.id);
     } else {
         order.payment_status = false;
         println!("Payment has failed!");
+        //Send the order to the monitoring system
         let serialized_order = serde_json::to_string(&order).unwrap();
         send_msg(serialized_order, "monitor_queue").unwrap();
         println!("Order ID {} has been sent to the monitoring system.", order.id);
