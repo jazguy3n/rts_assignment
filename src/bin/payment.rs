@@ -21,7 +21,7 @@ fn main() {
     loop {
         match payment_rx.recv() {
             Ok(mut received_order) => {
-                println!("Received Order:");
+                println!("Payment system received order:");
                 println!("Order ID: {}", received_order.id);
                 println!("Item: {}", received_order.item);
                 println!("Quantity: {}", received_order.quantity);

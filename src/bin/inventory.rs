@@ -20,7 +20,7 @@ fn main() {
     loop {
         match inventory_rx.recv() {
             Ok(received_order) => {
-                println!("Received Order:");
+                println!("Inventory system received order:");
                 println!("Order ID: {}", received_order.id);
                 println!("Item: {}", received_order.item);
                 println!("Quantity: {}", received_order.quantity);

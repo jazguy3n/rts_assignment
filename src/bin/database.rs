@@ -13,14 +13,17 @@ use serde_json;
 fn main() {
     let (database_tx, database_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
 
-    database_order(database_tx, orders);
+    // Spawn the thread to receive and store orders
+    thread::spawn(move || {
+        database_order(database_tx);
+    });
 
     loop {
         match database_rx.recv() {
             Ok(received_order) => {
                 println!(
-                    "Order ID: {}, Item: {}, Quantity: {}, Shipping Address: {}, Payment Status: {}, Delivery Status: {}, Final Status: {}",
-                    order.id, order.item, order.quantity, order.shipping_address, order.payment_status, order.delivery_status, order.final_status
+                    "Order ID: {}, Item: {}, Quantity: {}, Shipping Address: {}, Final Status: {}",
+                    received_order.id, received_order.item, received_order.quantity, received_order.shipping_address, received_order.final_status
                 );
             }
             Err(e) => {
@@ -31,7 +34,7 @@ fn main() {
     }
 }
 
-fn database_order(sender: Sender<Order>, orders: Arc<Mutex<Vec<Order>>>) {
+fn database_order(sender: Sender<Order>) {
     loop {
         let order = recv_msg("cancel_queue");
         if !order.is_empty() {
@@ -40,4 +43,3 @@ fn database_order(sender: Sender<Order>, orders: Arc<Mutex<Vec<Order>>>) {
         }
     }
 }
-

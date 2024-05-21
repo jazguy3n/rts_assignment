@@ -40,6 +40,7 @@ fn main() {
         println!("Shipping Address: {}", order.shipping_address);
         println!("Payment Status: {}", order.payment_status);
         println!("Delivery Status: {}", order.delivery_status);
+        println!("Final Status: {}", order.final_status);
         println!("--------------------------");
         thread::sleep(Duration::from_secs(7));
     }

@@ -19,7 +19,7 @@ fn main() {
     loop {
         match monitor_rx.recv() {
             Ok(mut received_order) => {
-                println!("Received Order:");
+                println!("Monitor system received order:");
                 println!("Order ID: {}", received_order.id);
                 println!("Item: {}", received_order.item);
                 println!("Quantity: {}", received_order.quantity);
@@ -53,7 +53,7 @@ fn monitor_order(sender: Sender<Order>) {
 fn attempt_repayment(order: &mut Order) {
     println!("Attempting to process payment again.......");
     let mut rng = rand::thread_rng();
-    if rng.gen_bool(0.8) {
+    if rng.gen_bool(0.7) {
         order.payment_status = true;
         println!("Payment is successful!");
         let serialized_order = serde_json::to_string(order).unwrap();
@@ -66,9 +66,10 @@ fn attempt_repayment(order: &mut Order) {
     }
 }
 
-fn cancel_order(order: &Order) {
+fn cancel_order(order: &mut Order) {
+    order.final_status = "Cancelled".to_string();
     println!("Order ID {} is being canceled due to repeated payment failure.", order.id);
-let serialized_order = serde_json::to_string(order).unwrap();
+    let serialized_order = serde_json::to_string(order).unwrap();
     send_msg(serialized_order, "cancel_queue").unwrap();
     println!("Recording information to database......");
 }
