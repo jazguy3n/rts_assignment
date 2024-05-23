@@ -27,14 +27,14 @@ impl Inventory {
     pub fn new() -> Self {
         let items = vec![
             ItemStock { name: "T-Shirt", quantity: MAX_CAPACITY },
-            ItemStock { name: "Hoodie", quantity: MAX_CAPACITY },
-            ItemStock { name: "Skirt", quantity: MAX_CAPACITY },
-            ItemStock { name: "Dress", quantity: MAX_CAPACITY },
-            ItemStock { name: "Wallet", quantity: MAX_CAPACITY },
-            ItemStock { name: "Shoes", quantity: MAX_CAPACITY },
-            ItemStock { name: "Socks", quantity: MAX_CAPACITY },
-            ItemStock { name: "Pants", quantity: MAX_CAPACITY },
-            ItemStock { name: "Shorts", quantity: MAX_CAPACITY },
+            // ItemStock { name: "Hoodie", quantity: MAX_CAPACITY },
+            // ItemStock { name: "Skirt", quantity: MAX_CAPACITY },
+            // ItemStock { name: "Dress", quantity: MAX_CAPACITY },
+            // ItemStock { name: "Wallet", quantity: MAX_CAPACITY },
+            // ItemStock { name: "Shoes", quantity: MAX_CAPACITY },
+            // ItemStock { name: "Socks", quantity: MAX_CAPACITY },
+            // ItemStock { name: "Pants", quantity: MAX_CAPACITY },
+            // ItemStock { name: "Shorts", quantity: MAX_CAPACITY },
         ];
         Inventory { stocks: items }
     }

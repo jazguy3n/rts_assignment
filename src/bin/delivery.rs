@@ -20,7 +20,7 @@ fn main() {
     loop {
         match delivery_rx.recv() {
             Ok(mut received_order) => {
-                println!("Payment system received order:");
+                println!("Delivery system received order:");
                 println!("Order ID: {}", received_order.id);
                 println!("Item: {}", received_order.item);
                 println!("Quantity: {}", received_order.quantity);
@@ -55,7 +55,7 @@ fn process_delivery(order: &mut Order) {
     let mut rng = rand::thread_rng();
     if rng.gen_bool(0.7) {
         order.delivery_status = true;
-        println!("The order was delivered successfully!");
+        println!("Deliver successfully!");
         order.final_status = "Delivered".to_string();
         //Send the order to the database system
         let serialized_order = serde_json::to_string(&order).unwrap();
@@ -63,7 +63,7 @@ fn process_delivery(order: &mut Order) {
         println!("Recording information to database......");
     } else {
         order.delivery_status = false;
-        println!("The order has not been successfully delivered!");
+        println!("Failure delivery!");
         //Send the order to the monitoring system
         let serialized_order = serde_json::to_string(&order).unwrap();
         send_msg(serialized_order, "monitor_queue").unwrap();

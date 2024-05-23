@@ -1,8 +1,8 @@
 use std::{
-    thread,
     sync::{mpsc::{self, Sender, Receiver}, Arc, Mutex},
+    thread,
+    time::Duration,
 };
-use std::time::Duration;
 
 use rts_assignment::{
     rabbitmq::{send_msg, recv_msg},
@@ -17,10 +17,11 @@ fn main() {
 
     // Spawn the thread to receive and process orders
     {
+        let inventory_tx = inventory_tx.clone();
         let inventory = Arc::clone(&inventory);
-        thread::spawn(move || {
+        thread::Builder::new().name("OrderReceiverThread".to_string()).spawn(move || {
             inventory_order(inventory_tx, inventory);
-        });
+        }).expect("Failed to spawn OrderReceiverThread");
     }
 
     loop {
@@ -45,7 +46,7 @@ fn main() {
     }
 }
 
-fn inventory_order(sender: Sender<Order>, inventory: Arc<Mutex<Inventory>>) {
+fn inventory_order(sender: Sender<Order>, _inventory: Arc<Mutex<Inventory>>) {
     loop {
         let order = recv_msg("inventory_queue");
         if !order.is_empty() {
@@ -64,17 +65,20 @@ fn process_order(order: &mut Order, inventory: &Arc<Mutex<Inventory>>) {
                 "Order ID {} is confirmed. Stock for {}: {}",
                 order.id, order.item, inv.get_stock(&order.item)
             );
-            //Send the order to the delivery system
+            // Send the order to the delivery system
             let serialized_order = serde_json::to_string(order).unwrap();
-            send_msg(serialized_order, "delivery_queue").unwrap();
-            println!("Order ID {} has been sent to the delivery system.", order.id);
+            if send_msg(serialized_order, "delivery_queue").is_err() {
+                eprintln!("Failed to send order ID {} to the delivery system.", order.id);
+            } else {
+                println!("Order ID {} has been sent to the delivery system.", order.id);
+            }
             break;
         } else {
             println!("Insufficient stock for {}. Waiting for restock...", order.item);
-            drop(inv); // Release the lock before sleeping
+            drop(inv); // Release the lock before restocking
             thread::sleep(Duration::from_secs(1));
-            inv = inventory.lock().unwrap();
-            inv.restock();
+            let mut inv = inventory.lock().unwrap();
+            inv.restock(); // Restock the inventory
         }
     }
 }
