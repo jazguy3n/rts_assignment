@@ -108,7 +108,7 @@ fn cancel_order(order: &mut Order) {
 
 fn return_item(order: &Order, inventory: &Arc<Mutex<Inventory>>) {
     let mut inv = inventory.lock().unwrap();
-    println!("Before refund, stock for {}: {}", order.item, inv.get_stock(&order.item)); // Debug print
+    println!("Before refund, stock for {}: {}", order.item, inv.get_stock(&order.item));
     inv.add_stock(&order.item, order.quantity);
     println!("Refunded stock for item {}: {}", order.item, order.quantity);
     println!("After refund, stock for {}: {}", order.item, inv.get_stock(&order.item)); // Debug print
