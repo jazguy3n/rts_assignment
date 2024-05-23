@@ -1,11 +1,11 @@
 use std::{
     thread,
-    sync::mpsc::{self, Sender, Receiver},
+    sync::{mpsc::{self, Sender, Receiver}, Arc, Mutex},
 };
 
 use rts_assignment::{
     rabbitmq::{recv_msg, send_msg},
-    structs::Order,
+    structs::{Order, Inventory},
 };
 
 use serde_json;
@@ -13,8 +13,16 @@ use rand::Rng;
 
 fn main() {
     let (monitor_tx, monitor_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
+    let inventory = Arc::new(Mutex::new(Inventory::new()));
 
-    monitor_order(monitor_tx);
+    // Spawn the thread to monitor orders
+    {
+        let monitor_tx = monitor_tx.clone();
+        let inventory = Arc::clone(&inventory);
+        thread::spawn(move || {
+            monitor_order(monitor_tx, inventory);
+        });
+    }
 
     loop {
         match monitor_rx.recv() {
@@ -26,8 +34,14 @@ fn main() {
                 println!("Shipping Address: {}", received_order.shipping_address);
                 println!("Payment Status: {}", received_order.payment_status);
 
-                // Attempt to process the payment again
-                attempt_repayment(&mut received_order);
+                if received_order.payment_status == false {
+                    // Attempt to process the payment again
+                    repayment(&mut received_order);
+                } else if received_order.payment_status == true && received_order.delivery_status == false {
+                    // Attempt to process the delivery again
+                    redelivery(&mut received_order, &inventory);
+                }
+
                 println!("--------------------------");
             }
             Err(e) => {
@@ -38,7 +52,7 @@ fn main() {
     }
 }
 
-fn monitor_order(sender: Sender<Order>) {
+fn monitor_order(sender: Sender<Order>, inventory: Arc<Mutex<Inventory>>) {
     thread::spawn(move || {
         loop {
             let order = recv_msg("monitor_queue");
@@ -50,7 +64,7 @@ fn monitor_order(sender: Sender<Order>) {
     });
 }
 
-fn attempt_repayment(order: &mut Order) {
+fn repayment(order: &mut Order) {
     println!("Attempting to process payment again.......");
     let mut rng = rand::thread_rng();
     if rng.gen_bool(0.7) {
@@ -62,14 +76,40 @@ fn attempt_repayment(order: &mut Order) {
     } else {
         order.payment_status = false;
         println!("Payment failed again!");
+        println!("Order ID {} is being canceled due to repeated payment failure.", order.id);
         cancel_order(order);
+    }
+}
+
+fn redelivery(order: &mut Order, inventory: &Arc<Mutex<Inventory>>) {
+    println!("Attempting to deliver the order again.......");
+    let mut rng = rand::thread_rng();
+    if rng.gen_bool(0.1) {
+        order.delivery_status = true;
+        println!("The order was delivered successfully!");
+        let serialized_order = serde_json::to_string(order).unwrap();
+        send_msg(serialized_order, "database_queue").unwrap();
+        println!("Recording information to database......");
+    } else {
+        order.delivery_status = false;
+        println!("The order has not been successfully delivered!");
+        println!("Order ID {} is being canceled due to repeated delivery failure.", order.id);
+        cancel_order(order);
+        return_item(order, inventory);
     }
 }
 
 fn cancel_order(order: &mut Order) {
     order.final_status = "Cancelled".to_string();
-    println!("Order ID {} is being canceled due to repeated payment failure.", order.id);
     let serialized_order = serde_json::to_string(order).unwrap();
-    send_msg(serialized_order, "cancel_queue").unwrap();
+    send_msg(serialized_order, "database_queue").unwrap();
     println!("Recording information to database......");
+}
+
+fn return_item(order: &Order, inventory: &Arc<Mutex<Inventory>>) {
+    let mut inv = inventory.lock().unwrap();
+    println!("Before refund, stock for {}: {}", order.item, inv.get_stock(&order.item)); // Debug print
+    inv.add_stock(&order.item, order.quantity);
+    println!("Refunded stock for item {}: {}", order.item, order.quantity);
+    println!("After refund, stock for {}: {}", order.item, inv.get_stock(&order.item)); // Debug print
 }

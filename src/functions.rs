@@ -6,9 +6,10 @@ use crate::structs::Order;
 
 pub fn generate_order(rng: &mut rand::rngs::ThreadRng, order_id_counter: &Arc<AtomicUsize>) -> Order {
     let item_list = vec![
-        "T-Shirt", "Hoodie", "Skirt",
-        "Dress", "Wallet", "Shoes",
-        "Socks", "Pants", "Shorts"];
+        "T-Shirt"];
+    // "Hoodie", "Skirt",
+    // "Dress", "Wallet", "Shoes",
+    // "Socks", "Pants", "Shorts"
 
     let location_list = vec![
         "Johor", "Kedah", "Kelantan",

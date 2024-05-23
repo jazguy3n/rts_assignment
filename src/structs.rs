@@ -49,6 +49,12 @@ impl Inventory {
         }
     }
 
+    pub fn add_stock(&mut self, item: &str, quantity: i32) {
+        if let Some(stock) = self.stocks.iter_mut().find(|stock| stock.name == item) {
+            stock.quantity += quantity;
+        }
+    }
+
     pub fn get_stock(&self, item: &str) -> i32 {
         self.stocks.iter().find(|stock| stock.name == item).map_or(0, |stock| stock.quantity)
     }

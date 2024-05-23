@@ -36,7 +36,7 @@ fn main() {
 
 fn database_order(sender: Sender<Order>) {
     loop {
-        let order = recv_msg("cancel_queue");
+        let order = recv_msg("database_queue");
         if !order.is_empty() {
             let deserialized_order: Order = serde_json::from_str(&order).unwrap();
             sender.send(deserialized_order).unwrap();
