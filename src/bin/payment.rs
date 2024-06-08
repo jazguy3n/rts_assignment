@@ -1,72 +1,48 @@
-use std::{
-    thread,
-    sync::mpsc::{self, Sender, Receiver},
-};
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread;
 
 use rts_assignment::{
-    rabbitmq::{send_msg, recv_msg},
     structs::Order,
+    functions::{
+        process_payment,
+        receive_orders,
+        receive_exit_signal
+    },
 };
 
-use serde_json;
-use rand::Rng;
-
 fn main() {
-    let (payment_tx, payment_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
+    // Define the queue name for payment processing
+    let queue_name = "payment_queue";
 
-    // Spawn the order-receiving thread
-    payment_order(payment_tx);
+    // Create channels for order processing and exit signals
+    let (order_tx, order_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
+    let (exit_tx, exit_rx): (Sender<()>, Receiver<()>) = mpsc::channel();
 
+    // Spawn a thread to receive orders
+    let order_handle = thread::spawn(move || receive_orders(queue_name, order_tx));
+
+    // Spawn a thread to receive the exit signal
+    let exit_handle = thread::spawn(move || receive_exit_signal(exit_tx));
+
+    // Main thread loop for processing orders
     loop {
-        match payment_rx.recv() {
-            Ok(mut received_order) => {
-                println!("Payment system received order:");
-                println!("Order ID: {}", received_order.id);
-                println!("Item: {}", received_order.item);
-                println!("Quantity: {}", received_order.quantity);
-                println!("Shipping Address: {}", received_order.shipping_address);
+        // Check for exit signal
+        if exit_rx.try_recv().is_ok() {
+            println!("Received exit signal. Shutting down payment system.");
+            break;
+        }
 
-                //Processing payment of the order
-                process_payment(&mut received_order);
-                println!("--------------------------");
-            }
-            Err(e) => {
-                println!("Error receiving order: {}", e);
-                break;
-            }
+        // Process orders sequentially
+        if let Ok(mut order) = order_rx.try_recv() {
+            process_payment(&mut order);
         }
     }
+
+    // Ensure both threads are joined before shutting down
+    order_handle.join().unwrap();
+    exit_handle.join().unwrap();
+
+    println!("Payment system is shutting down...");
 }
 
-fn payment_order(sender: Sender<Order>) {
-    thread::spawn(move || {
-        loop {
-            let order = recv_msg("order_queue");
-            if !order.is_empty() {
-                let deserialized_order: Order = serde_json::from_str(&order).unwrap();
-                sender.send(deserialized_order).unwrap();
-            }
-        }
-    });
-}
-
-fn process_payment(order: &mut Order) {
-    println!("Payment is processing......");
-    let mut rng = rand::thread_rng();
-    if rng.gen_bool(0.7) {
-        order.payment_status = true;
-        println!("Payment is successful!");
-        //Send the order to the inventory system
-        let serialized_order = serde_json::to_string(&order).unwrap();
-        send_msg(serialized_order, "inventory_queue").unwrap();
-        println!("Order ID {} has been sent to the inventory system.", order.id);
-    } else {
-        order.payment_status = false;
-        println!("Payment has failed!");
-        //Send the order to the monitoring system
-        let serialized_order = serde_json::to_string(&order).unwrap();
-        send_msg(serialized_order, "monitor_queue").unwrap();
-        println!("Order ID {} has been sent to the monitoring system.", order.id);
-    }
-}
 

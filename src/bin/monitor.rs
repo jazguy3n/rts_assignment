@@ -4,8 +4,9 @@ use std::{
 };
 
 use rts_assignment::{
-    rabbitmq::{recv_msg, send_msg},
+    rabbitmq::recv_msg,
     structs::Order,
+    functions::{send_to_inventory, send_to_database},
 };
 
 use serde_json;
@@ -19,12 +20,7 @@ fn main() {
     loop {
         match monitor_rx.recv() {
             Ok(mut received_order) => {
-                println!("Monitor system received order:");
-                println!("Order ID: {}", received_order.id);
-                println!("Item: {}", received_order.item);
-                println!("Quantity: {}", received_order.quantity);
-                println!("Shipping Address: {}", received_order.shipping_address);
-                println!("Payment Status: {}", received_order.payment_status);
+                println!("Monitor system received order ID: {}", received_order.id);
 
                 if !received_order.payment_status {
                     // Attempt to process the payment again
@@ -62,9 +58,7 @@ fn repayment(order: &mut Order) {
     if rng.gen_bool(0.7) {
         order.payment_status = true;
         println!("Payment is successful!");
-        let serialized_order = serde_json::to_string(order).unwrap();
-        send_msg(serialized_order, "inventory_queue").unwrap();
-        println!("Order ID {} has been sent to the inventory system.", order.id);
+        send_to_inventory(order);
     } else {
         order.payment_status = false;
         println!("Payment failed again!");
@@ -80,9 +74,7 @@ fn redelivery(order: &mut Order) {
         order.delivery_status = true;
         order.final_status = "Delivered".to_string();
         println!("The order was delivered successfully!");
-        let serialized_order = serde_json::to_string(order).unwrap();
-        send_msg(serialized_order, "database_queue").unwrap();
-        println!("Recording information to database......");
+        send_to_database(order);
     } else {
         order.delivery_status = false;
         println!("The order has not been successfully delivered!");
@@ -93,7 +85,10 @@ fn redelivery(order: &mut Order) {
 
 fn cancel_order(order: &mut Order) {
     order.final_status = "Cancelled".to_string();
-    let serialized_order = serde_json::to_string(order).unwrap();
-    send_msg(serialized_order, "database_queue").unwrap();
-    println!("Recording information to database......");
+    send_to_database(order);
 }
+// fn return_item(order: &mut Order) {
+//     let serialized_order = serde_json::to_string(order).unwrap();
+//     send_msg(serialized_order, "inventory_queue").unwrap();
+//     println!("Return items back to inventory......");
+// }
