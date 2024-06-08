@@ -20,12 +20,10 @@ pub fn recv_msg(queue_name: &str) -> String {
     let mut order = "".to_string();
 
     // Open connection.
-    let mut connection: Connection = Connection::insecure_open(
-        "amqp://guest:guest@localhost:5672"
-    ).unwrap();
+    let mut connection = Connection::insecure_open("amqp://guest:guest@localhost:5672").unwrap();
 
     // Open a channel - None says let the library choose the channel ID.
-    let channel: amiquip::Channel = connection.open_channel(None).unwrap();
+    let channel = connection.open_channel(None).unwrap();
 
     // Declare the queue.
     let queue = channel.queue_declare(queue_name, QueueDeclareOptions::default()).unwrap();
@@ -52,3 +50,4 @@ pub fn recv_msg(queue_name: &str) -> String {
     let _ = connection.close();
     order
 }
+

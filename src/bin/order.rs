@@ -4,13 +4,13 @@ use std::{
 };
 
 use rts_assignment::{
-    rabbitmq::send_msg,
-    functions::generate_orders,
+    functions::{
+        generate_orders,
+        send_queue,
+    },
 };
 
-use serde_json;
-
-const ORDER_LIMIT: i32 = 3;
+const ORDER_LIMIT: i32 = 10;
 
 fn main() {
     let (order_tx, order_rx) = channel();
@@ -21,10 +21,13 @@ fn main() {
     });
 
     // Order processing in the main thread
-    for _ in 0..ORDER_LIMIT {
+    loop {
         if let Ok(order) = order_rx.recv() {
-            let serialized_order = serde_json::to_string(&order).unwrap();
-            send_msg(serialized_order, "payment_queue").unwrap();
+            if order.id == -1 {
+                send_queue(&order, "payment");
+                println!("All orders have been processed. Shutting the down order system...");
+                break;
+            }
             println!("Order ID: {}", order.id);
             println!("Item: {}", order.item);
             println!("Quantity: {}", order.quantity);
@@ -32,11 +35,8 @@ fn main() {
             println!("Payment Status: {}", order.payment_status);
             println!("Delivery Status: {}", order.delivery_status);
             println!("Final Status: {}", order.final_status);
-            println!("--------------------------");
+            send_queue(&order, "payment");
+            println!("------------------------------------------------------------------");
         }
     }
-
-    // Signal to indicate no more orders will be sent
-    send_msg("exit".to_string(), "exit_queue").unwrap();
-    println!("All orders processed. Shutdown system....");
 }

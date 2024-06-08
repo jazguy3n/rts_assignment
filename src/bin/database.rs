@@ -4,42 +4,36 @@ use std::{
 };
 
 use rts_assignment::{
-    rabbitmq::recv_msg,
     structs::Order,
+    functions::receive_orders,
 };
 
-use serde_json;
-
 fn main() {
-    let (database_tx, database_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
+    let queue_name = "database_queue";
 
-    // Spawn the thread to receive and store orders
-    thread::spawn(move || {
-        database_order(database_tx);
-    });
+    // Create channels for order processing
+    let (order_tx, order_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
+
+    // Spawn a thread to receive orders
+    thread::spawn(move || receive_orders(queue_name, order_tx));
 
     loop {
-        match database_rx.recv() {
-            Ok(received_order) => {
+        match order_rx.recv() {
+            Ok(order) => {
+                if order.id == -1 {
+                    println!("Shutting down the database system...");
+                    break;
+                }
                 println!(
                     "Order ID: {}, Item: {}, Quantity: {}, Shipping Address: {}, Final Status: {}",
-                    received_order.id, received_order.item, received_order.quantity, received_order.shipping_address, received_order.final_status
+                    order.id, order.item, order.quantity, order.shipping_address, order.final_status
                 );
+                println!("---------------------------------------------------------------------------------------------")
             }
             Err(e) => {
                 println!("Error receiving order: {}", e);
                 break;
             }
-        }
-    }
-}
-
-fn database_order(sender: Sender<Order>) {
-    loop {
-        let order = recv_msg("database_queue");
-        if !order.is_empty() {
-            let deserialized_order: Order = serde_json::from_str(&order).unwrap();
-            sender.send(deserialized_order).unwrap();
         }
     }
 }

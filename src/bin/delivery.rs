@@ -4,70 +4,41 @@ use std::{
 };
 
 use rts_assignment::{
-    rabbitmq::{send_msg, recv_msg},
     structs::Order,
+    functions::{
+        receive_orders,
+        process_delivery,
+        send_queue,
+    }
 };
 
-use serde_json;
-use rand::Rng;
-
 fn main() {
-    let (delivery_tx, delivery_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
+    // Define the queue name for payment processing
+    let queue_name = "delivery_queue";
 
-    // Spawn the order-receiving thread
-    delivery_order(delivery_tx);
+    // Create channels for order processing
+    let (order_tx, order_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
 
+    // Spawn a thread to receive orders
+    thread::spawn(move || receive_orders(queue_name, order_tx));
+
+    // Main thread loop for processing orders
     loop {
-        match delivery_rx.recv() {
-            Ok(mut received_order) => {
-                println!("Delivery system received order:");
-                println!("Order ID: {}", received_order.id);
-                println!("Item: {}", received_order.item);
-                println!("Quantity: {}", received_order.quantity);
-                println!("Shipping Address: {}", received_order.shipping_address);
-
-                //Processing payment of the order
-                process_delivery(&mut received_order);
-                println!("--------------------------");
+        // Process orders sequentially
+        match order_rx.recv() {
+            Ok(mut order) => {
+                if order.id == -1 {
+                    send_queue(&order, "monitoring");
+                    println!("Shutting down the delivery system...");
+                    break;
+                }
+                process_delivery(&mut order);
             }
             Err(e) => {
-                println!("Error receiving order: {}", e);
+                println!("Error receiving order: {:?}", e);
                 break;
             }
         }
-    }
-}
-
-fn delivery_order(sender: Sender<Order>) {
-    thread::spawn(move || {
-        loop {
-            let order = recv_msg("delivery_queue");
-            if !order.is_empty() {
-                let deserialized_order: Order = serde_json::from_str(&order).unwrap();
-                sender.send(deserialized_order).unwrap();
-            }
-        }
-    });
-}
-
-fn process_delivery(order: &mut Order) {
-    println!("Delivery to the address in the order...");
-    let mut rng = rand::thread_rng();
-    if rng.gen_bool(0.7) {
-        order.delivery_status = true;
-        println!("Deliver successfully!");
-        order.final_status = "Delivered".to_string();
-        //Send the order to the database system
-        let serialized_order = serde_json::to_string(&order).unwrap();
-        send_msg(serialized_order, "database_queue").unwrap();
-        println!("Recording information to database......");
-    } else {
-        order.delivery_status = false;
-        println!("Failure delivery!");
-        //Send the order to the monitoring system
-        let serialized_order = serde_json::to_string(&order).unwrap();
-        send_msg(serialized_order, "monitor_queue").unwrap();
-        println!("Order ID {} has been sent to the monitoring system.", order.id);
     }
 }
 

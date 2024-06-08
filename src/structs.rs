@@ -21,20 +21,20 @@ pub struct Inventory {
     pub stocks: Vec<ItemStock>,
 }
 
-pub const MAX_CAPACITY: i32 = 20;
+pub const MAX_CAPACITY: i32 = 10;
 
 impl Inventory {
     pub fn new() -> Self {
         let items = vec![
             ItemStock { name: "T-Shirt", quantity: MAX_CAPACITY },
-            // ItemStock { name: "Hoodie", quantity: MAX_CAPACITY },
-            // ItemStock { name: "Skirt", quantity: MAX_CAPACITY },
-            // ItemStock { name: "Dress", quantity: MAX_CAPACITY },
-            // ItemStock { name: "Wallet", quantity: MAX_CAPACITY },
-            // ItemStock { name: "Shoes", quantity: MAX_CAPACITY },
-            // ItemStock { name: "Socks", quantity: MAX_CAPACITY },
-            // ItemStock { name: "Pants", quantity: MAX_CAPACITY },
-            // ItemStock { name: "Shorts", quantity: MAX_CAPACITY },
+            ItemStock { name: "Hoodie", quantity: MAX_CAPACITY },
+            ItemStock { name: "Skirt", quantity: MAX_CAPACITY },
+            ItemStock { name: "Dress", quantity: MAX_CAPACITY },
+            ItemStock { name: "Wallet", quantity: MAX_CAPACITY },
+            ItemStock { name: "Shoes", quantity: MAX_CAPACITY },
+            ItemStock { name: "Socks", quantity: MAX_CAPACITY },
+            ItemStock { name: "Pants", quantity: MAX_CAPACITY },
+            ItemStock { name: "Shorts", quantity: MAX_CAPACITY },
         ];
         Inventory { stocks: items }
     }
@@ -59,10 +59,9 @@ impl Inventory {
         self.stocks.iter().find(|stock| stock.name == item).map_or(0, |stock| stock.quantity)
     }
 
-    pub fn restock(&mut self) {
-        for stock in &mut self.stocks {
+    pub fn restock(&mut self, item: &str) {
+        if let Some(stock) = self.stocks.iter_mut().find(|stock| stock.name == item) {
             stock.quantity = MAX_CAPACITY;
         }
-        println!("Inventory restocked to maximum capacity.");
     }
 }

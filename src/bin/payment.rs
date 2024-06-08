@@ -6,43 +6,37 @@ use rts_assignment::{
     functions::{
         process_payment,
         receive_orders,
-        receive_exit_signal
+        send_queue,
     },
 };
 
 fn main() {
-    // Define the queue name for payment processing
+    // Use match to determine the queue name based on the condition
     let queue_name = "payment_queue";
 
-    // Create channels for order processing and exit signals
+    // Create channels for order processing
     let (order_tx, order_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
-    let (exit_tx, exit_rx): (Sender<()>, Receiver<()>) = mpsc::channel();
 
     // Spawn a thread to receive orders
-    let order_handle = thread::spawn(move || receive_orders(queue_name, order_tx));
-
-    // Spawn a thread to receive the exit signal
-    let exit_handle = thread::spawn(move || receive_exit_signal(exit_tx));
+    thread::spawn(move || receive_orders(queue_name, order_tx));
 
     // Main thread loop for processing orders
     loop {
-        // Check for exit signal
-        if exit_rx.try_recv().is_ok() {
-            println!("Received exit signal. Shutting down payment system.");
-            break;
-        }
-
         // Process orders sequentially
-        if let Ok(mut order) = order_rx.try_recv() {
-            process_payment(&mut order);
+        match order_rx.recv() {
+            Ok(mut order) => {
+                if order.id == -1 {
+                    send_queue(&order, "inventory");
+                    println!("Shutting down the payment system...");
+                    break;
+                }
+
+                process_payment(&mut order);
+            }
+            Err(e) => {
+                println!("Error receiving order: {:?}", e);
+                break;
+            }
         }
     }
-
-    // Ensure both threads are joined before shutting down
-    order_handle.join().unwrap();
-    exit_handle.join().unwrap();
-
-    println!("Payment system is shutting down...");
 }
-
-

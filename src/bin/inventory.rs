@@ -1,84 +1,67 @@
 use std::{
     sync::{mpsc::{self, Sender, Receiver}, Arc, Mutex},
     thread,
-    time::Duration,
 };
 
 use rts_assignment::{
-    rabbitmq::{send_msg, recv_msg},
     structs::{Order, Inventory},
+    functions::{
+        receive_orders,
+        handle_return,
+        inventory_checking,
+        send_queue,
+    },
 };
 
-use serde_json;
 
 fn main() {
-    let (inventory_tx, inventory_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
+    // Define the queue names for order processing and return processing
+    let queue_name = "inventory_queue";
+    let queue_name_return = "return_inventory_queue"; // Ensure this matches the monitor system
+
+    // Create channels for order and return processing
+    let (order_tx, order_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
+    let (return_tx, return_rx): (Sender<Order>, Receiver<Order>) = mpsc::channel();
+
+    // Initialize inventory
     let inventory = Arc::new(Mutex::new(Inventory::new()));
 
-    // Spawn the thread to receive and process orders
-    {
-        let inventory_tx = inventory_tx.clone();
-        let inventory = Arc::clone(&inventory);
-        thread::Builder::new().name("OrderReceiverThread".to_string()).spawn(move || {
-            inventory_order(inventory_tx, inventory);
-        }).expect("Failed to spawn OrderReceiverThread");
-    }
+    // Spawn threads to receive orders and returns
+    let inventory_clone = Arc::clone(&inventory);
+    thread::spawn(move || receive_orders(queue_name, order_tx));
 
+    let inventory_clone_return = Arc::clone(&inventory);
+    thread::spawn(move || receive_orders(queue_name_return, return_tx));
+
+    // Main thread loop for processing orders and returns
     loop {
-        match inventory_rx.recv() {
-            Ok(mut received_order) => {
-                println!("Inventory system received order:");
-                println!("Order ID: {}", received_order.id);
-                println!("Item: {}", received_order.item);
-                println!("Quantity: {}", received_order.quantity);
-                println!("Shipping Address: {}", received_order.shipping_address);
-                println!("Payment Status: {}", received_order.payment_status);
-
-                // Check inventory and process the order
-                process_order(&mut received_order, &inventory);
-                println!("--------------------------");
+        // Handle returns first
+        match return_rx.try_recv() {
+            Ok(return_order) => {
+                println!("[Return ID {}] Received return order", return_order.id);
+                handle_return(&inventory_clone_return, &return_order);
             }
-            Err(e) => {
-                println!("Error receiving order: {}", e);
-                break;
+            Err(_) => {
+                // No returns to process, proceed to handle orders
+                match order_rx.try_recv() {
+                    Ok(mut order) => {
+                        if order.id == -1 {
+                            send_queue(&order, "delivery");
+                            println!("Inventory system has been shut down.");
+                            break;
+                        }
+
+                        // Check the inventory and process the order
+                        inventory_checking(&inventory_clone, &mut order);
+                    }
+                    Err(_) => {
+                        // No orders to process
+                    }
+                }
             }
         }
-    }
-}
 
-fn inventory_order(sender: Sender<Order>, _inventory: Arc<Mutex<Inventory>>) {
-    loop {
-        let order = recv_msg("inventory_queue");
-        if !order.is_empty() {
-            let deserialized_order: Order = serde_json::from_str(&order).unwrap();
-            sender.send(deserialized_order).unwrap();
-        }
-    }
-}
-
-fn process_order(order: &mut Order, inventory: &Arc<Mutex<Inventory>>) {
-    loop {
-        let mut inv = inventory.lock().unwrap();
-        if inv.is_stock_available(&order.item, order.quantity) {
-            inv.deduct_stock(&order.item, order.quantity);
-            println!(
-                "Order ID {} is confirmed. Stock for {}: {}",
-                order.id, order.item, inv.get_stock(&order.item)
-            );
-            // Send the order to the delivery system
-            let serialized_order = serde_json::to_string(order).unwrap();
-            if send_msg(serialized_order, "delivery_queue").is_err() {
-                eprintln!("Failed to send order ID {} to the delivery system.", order.id);
-            } else {
-                println!("Order ID {} has been sent to the delivery system.", order.id);
-            }
-            break;
-        } else {
-            println!("Insufficient stock for {}. Waiting for restock...", order.item);
-            drop(inv); // Release the lock before restocking
-            thread::sleep(Duration::from_secs(1));
-            let mut inv = inventory.lock().unwrap();
-            inv.restock(); // Restock the inventory
-        }
+        // Add a small sleep to avoid busy waiting
+        thread::sleep(std::time::Duration::from_millis(100));
     }
 }
