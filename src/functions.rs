@@ -1,7 +1,7 @@
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
-// use std::thread;
-// use std::time::Duration;
+use std::thread;
+use std::time::Duration;
 use rand::{
     prelude::SliceRandom,
     Rng,
@@ -76,7 +76,7 @@ pub fn generate_orders(order_tx: &Sender<Order>, limit: i32) {
         };
 
         order_tx.send(order).unwrap();
-        // thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_secs(1));
     }
 
     // Send a sentinel order to indicate the end of orders
