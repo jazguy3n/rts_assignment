@@ -151,6 +151,9 @@ pub fn process_delivery(order: &mut Order) {
 
     // Simulate a delivery process with a 50% success rate
     if rng.gen_bool(0.5) {
+        // Allocate courier based on the shipping address
+        let courier = allocate_courier(&order.shipping_address);
+        println!("[Order ID {}] Shipping location: {} is allocated Courier as {}", order.id, order.shipping_address, courier);
         order.delivery_status = true;
         println!("[Order ID {}] Deliver successfully!", order.id);
         order.final_status = "Delivered".to_string();
@@ -166,6 +169,21 @@ pub fn process_delivery(order: &mut Order) {
     }
 
     println!("---------------------------------------------");
+}
+
+pub fn allocate_courier(shipping_address: &str) -> &'static str {
+    match shipping_address {
+        // Peninsular Malaysia - Land transportation
+        "Johor" | "Kedah" | "Kelantan" | "Kuala Lumpur" | "Melaka" |
+        "Negeri Sembilan" | "Pahang" | "Penang" | "Perak" | "Perlis" |
+        "Putrajaya" | "Selangor" | "Terengganu" => "Land",
+
+        // East Malaysia - Sea transportation
+        "Sabah" | "Sarawak" | "Labuan" => "Sea",
+
+        // Default to air transportation if not recognized
+        _ => "Air",
+    }
 }
 
 // Monitoring system functions

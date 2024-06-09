@@ -25,10 +25,9 @@ fn main() {
                     break;
                 }
                 println!(
-                    "Order ID: {}, Item: {}, Quantity: {}, Shipping Address: {}, Final Status: {}",
+                    "[Order ID {}] Item: {}, Quantity: {}, Shipping Address: {}, Final Status: {}",
                     order.id, order.item, order.quantity, order.shipping_address, order.final_status
                 );
-                println!("---------------------------------------------------------------------------------------------")
             }
             Err(e) => {
                 println!("Error receiving order: {}", e);
